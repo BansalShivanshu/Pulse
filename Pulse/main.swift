@@ -11,42 +11,42 @@ import Network
 class Pulse {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue.global(qos: .background)
-    private var lastStatus: NWPath.Status?
+    private var isCurrentlyOnline: Bool?
 
     init() {
         monitor.pathUpdateHandler = { [weak self] path in
-            self?.handleNetworkChange(status: path.status)
+            self?.handleNetworkChange(path: path)
         }
         monitor.start(queue: queue)
     }
 
-    private func handleNetworkChange(status: NWPath.Status) {
-        if status != lastStatus {
-            lastStatus = status
-            switch status {
-            case .satisfied:
-                sendNotification(
-                    title: "Network Status",
-                    message: "✅ You are back online!",
-                    sound: true
-                )
-            case .unsatisfied:
-                sendNotification(
-                    title: "Network Status",
-                    message: "❌ You went offline!",
-                    sound: true
-                )
-            default:
-                break
-            }
+    private func handleNetworkChange(path: NWPath) {
+        let isOnline = (path.status == .satisfied) && !path.isConstrained
+
+        // If status hasn't changed, do nothing
+        guard isOnline != isCurrentlyOnline else { return }
+        isCurrentlyOnline = isOnline
+
+        if isOnline {
+            sendNotification(
+                title: "Network Status",
+                message: "✅ You're back online!",
+                sound: "Glass"
+            )
+        } else {
+            sendNotification(
+                title: "Network Status",
+                message: "⚠️ You went offline!",
+                sound: "Funk"
+            )
         }
     }
 
-    private func sendNotification(title: String, message: String, sound: Bool = false) {
+    private func sendNotification(title: String, message: String, sound: String? = nil) {
 //        Using AppleScript for macOS Notification Center
         var script = "display notification \"\(message)\" with title \"\(title)\""
-        if sound {
-            script += " sound name \"Blow\""
+        if let sound = sound {
+            script += " sound name \"\(sound)\""
         }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -55,5 +55,6 @@ class Pulse {
     }
 }
 
+// Start a lightweight daemon
 let monitor = Pulse()
 RunLoop.main.run()
