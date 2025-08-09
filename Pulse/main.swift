@@ -10,14 +10,18 @@ import Network
 
 final class Pulse {
     private let watcher = WiFiConnectivityWatcher()
+    private var lastState: InternetState?
 
     init() {
         watcher.onChange = { [weak self] state in
+            guard state != self?.lastState else { return }   // only notify on change
+            self?.lastState = state
+
             switch state {
             case .online:
                 self?.notify(title: "Network Status", message: "✅ Internet is available", sound: "Glass")
             case .wifiNoInternet:
-                self?.notify(title: "Network Status", message: "⚠️ Wi‑Fi connected, but no internet", sound: "Funk")
+                self?.notify(title: "Network Status", message: "⚠️ WiFi connected, but no internet", sound: "Funk")
             case .offline:
                 self?.notify(title: "Network Status", message: "❌ Offline", sound: "Funk")
             }
