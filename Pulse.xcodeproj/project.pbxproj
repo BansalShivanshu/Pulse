@@ -10,8 +10,8 @@
 		AF3AF8FE2E3C537B00BD29ED /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
+			dstPath = usr/share/man/man1;
+			dstSubfolderSpec = 7;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 1;
@@ -20,11 +20,25 @@
 
 /* Begin PBXFileReference section */
 		AF3AF9002E3C537B00BD29ED /* Pulse */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Pulse; sourceTree = BUILT_PRODUCTS_DIR; };
+		AF3AF90D2E3C81B600BD29ED /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		AF3AF9122E3C862700BD29ED /* Exceptions for "Pulse" folder in "Copy Files" phase from "Pulse" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = AF3AF8FE2E3C537B00BD29ED /* CopyFiles */;
+			membershipExceptions = (
+				AppIcon.icns,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AF3AF9022E3C537B00BD29ED /* Pulse */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AF3AF9122E3C862700BD29ED /* Exceptions for "Pulse" folder in "Copy Files" phase from "Pulse" target */,
+			);
 			path = Pulse;
 			sourceTree = "<group>";
 		};
@@ -44,6 +58,7 @@
 		AF3AF8F72E3C537B00BD29ED = {
 			isa = PBXGroup;
 			children = (
+				AF3AF90D2E3C81B600BD29ED /* Assets.xcassets */,
 				AF3AF9022E3C537B00BD29ED /* Pulse */,
 				AF3AF9012E3C537B00BD29ED /* Products */,
 			);
@@ -253,6 +268,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 9L6V4VLLG2;
 				ENABLE_HARDENED_RUNTIME = YES;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "x-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
@@ -264,6 +280,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 9L6V4VLLG2;
 				ENABLE_HARDENED_RUNTIME = YES;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "x-";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};

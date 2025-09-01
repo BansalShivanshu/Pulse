@@ -13,6 +13,18 @@ final class Pulse {
     private var lastState: InternetState?
 
     init() {
+        // Self-install flags (nice dev ergonomics)
+        if CommandLine.arguments.contains("--install-agent") {
+            do { try LaunchAgentManager.install(); print("✅ Installed & started LaunchAgent") }
+            catch { fputs("❌ Install failed: \(error)\n", stderr); exit(1) }
+            exit(0)
+        }
+        if CommandLine.arguments.contains("--uninstall-agent") {
+            do { try LaunchAgentManager.uninstall(); print("🗑️  Uninstalled LaunchAgent") }
+            catch { fputs("⚠️ Uninstall error: \(error)\n", stderr); exit(1) }
+            exit(0)
+        }
+        
         watcher.onChange = { [weak self] state in
             guard state != self?.lastState else { return }   // only notify on change
             self?.lastState = state
