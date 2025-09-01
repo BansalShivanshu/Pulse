@@ -8,6 +8,13 @@
 import Foundation
 import Network
 
+// MARK: - Configuration
+
+private struct ProbeConfiguration {
+    static let httpTimeout: TimeInterval = 3.0
+    static let tcpTimeout: TimeInterval = 2.5
+}
+
 /**
     Connectivity Service, probes Google, Cloudflare, Microsoft (HTTP) +
     TCP (Cloudflare, Google, Microsoft) IANA
@@ -17,21 +24,21 @@ final class ConnectivityService {
     private let httpProbes: [HTTPProbe] = [
         // Google: tiny empty 204
         .init(url: URL(string: "https://www.google.com/generate_204")!,
-              method: "HEAD", timeout: 3, expectation: .status(204...204)),
+              method: "HEAD", timeout: ProbeConfiguration.httpTimeout, expectation: .status(204...204)),
 
         // Cloudflare: small diagnostic text body
         .init(url: URL(string: "https://www.cloudflare.com/cdn-cgi/trace")!,
-              method: "GET", timeout: 3, expectation: .bodyContains("h=")),
+              method: "GET", timeout: ProbeConfiguration.httpTimeout, expectation: .bodyContains("h=")),
 
         // Microsoft NCSI / ConnectTest (HTTP, no TLS)
         .init(url: URL(string: "http://www.msftconnecttest.com/connecttest.txt")!,
-              method: "GET", timeout: 3, expectation: .exactBody("Microsoft Connect Test")),
+              method: "GET", timeout: ProbeConfiguration.httpTimeout, expectation: .exactBody("Microsoft Connect Test")),
         .init(url: URL(string: "http://www.msftncsi.com/ncsi.txt")!,
-              method: "GET", timeout: 3, expectation: .exactBody("Microsoft NCSI")),
+              method: "GET", timeout: ProbeConfiguration.httpTimeout, expectation: .exactBody("Microsoft NCSI")),
 
         // IANA example.com (HTTP, no TLS dependency)
         .init(url: URL(string: "http://example.com/")!,
-              method: "HEAD", timeout: 3, expectation: .status(200...299)),
+              method: "HEAD", timeout: ProbeConfiguration.httpTimeout, expectation: .status(200...299)),
     ]
 
     // Raw TCP to avoid DNS/HTTP dependencies (Cloudflare + Google)
@@ -61,70 +68,123 @@ final class ConnectivityService {
         var sawHTTPResponseButUnexpected = false
         var tcpConnected = false
 
-        // HTTP Probes
-        for p in httpProbes {
-            group.enter()
-            var req = URLRequest(url: p.url)
-            req.httpMethod = p.method
-            req.timeoutInterval = p.timeout
-
-            session.dataTask(with: req) { data, resp, err in
-                defer { group.leave() }
-                guard err == nil, let http = resp as? HTTPURLResponse else { return }
-                let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-
-                let matched: Bool = {
-                    switch p.expectation {
-                    case .status(let r): return r.contains(http.statusCode)
-                    case .exactBody(let s): return body.trimmingCharacters(in: .whitespacesAndNewlines) == s
-                    case .bodyContains(let s): return body.contains(s)
-                    }
-                }()
-
-                lock.lock()
-                if matched { httpOK = true }
-                else { sawHTTPResponseButUnexpected = true } // often captive portal / walled garden
-                lock.unlock()
-            }.resume()
+        // Run HTTP probes
+        runHTTPProbes(group: group, lock: lock) { isOK, sawUnexpected in
+            lock.lock()
+            if isOK { httpOK = true }
+            if sawUnexpected { sawHTTPResponseButUnexpected = true }
+            lock.unlock()
         }
 
-        // TCP probes
-        for target in tcpTargets {
+        // Run TCP probes
+        runTCPProbes(group: group, lock: lock) { connected in
+            lock.lock()
+            if connected { tcpConnected = true }
+            lock.unlock()
+        }
+
+        // Evaluate results when all probes complete
+        group.notify(queue: .main) {
+            let state = self.determineInternetState(
+                httpOK: httpOK,
+                sawHTTPResponseButUnexpected: sawHTTPResponseButUnexpected,
+                tcpConnected: tcpConnected,
+                path: path
+            )
+            completion(state)
+        }
+    }
+
+    // MARK: - Private Helper Methods
+
+    private func runHTTPProbes(
+        group: DispatchGroup,
+        lock: NSLock,
+        onResult: @escaping (Bool, Bool) -> Void
+    ) {
+        for probe in httpProbes {
             group.enter()
-            tcpConnect(host: target.host, port: target.port, timeout: 2.5) { ok in
-                lock.lock(); if ok { tcpConnected = true }; lock.unlock()
+            executeHTTPProbe(probe: probe) { isOK, sawUnexpected in
+                onResult(isOK, sawUnexpected)
                 group.leave()
             }
         }
+    }
 
-        group.notify(queue: .main) {
-            // Prioritize real web usability first
-            if httpOK {
-                completion(.online)
-                return
+    private func executeHTTPProbe(
+        probe: HTTPProbe,
+        completion: @escaping (Bool, Bool) -> Void
+    ) {
+        var req = URLRequest(url: probe.url)
+        req.httpMethod = probe.method
+        req.timeoutInterval = probe.timeout
+
+        session.dataTask(with: req) { data, resp, err in
+            guard err == nil, let http = resp as? HTTPURLResponse else { 
+                completion(false, false)
+                return 
             }
+            let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
 
-            // If we got HTTP responses but none matched expectations (common on captive portals),
-            // prefer reporting "Wi‑Fi but no internet" right away.
-            if sawHTTPResponseButUnexpected {
-                if let path, path.status == .satisfied, path.usesInterfaceType(.wifi) {
-                    completion(.wifiNoInternet)
-                } else {
-                    completion(.offline)
-                }
-                return
+            let matched = self.evaluateHTTPExpectation(probe.expectation, response: http, body: body)
+            completion(matched, !matched)
+        }.resume()
+    }
+
+    private func evaluateHTTPExpectation(_ expectation: HTTPProbe.Expectation, response: HTTPURLResponse, body: String) -> Bool {
+        switch expectation {
+        case .status(let range): 
+            return range.contains(response.statusCode)
+        case .exactBody(let expected): 
+            return body.trimmingCharacters(in: .whitespacesAndNewlines) == expected
+        case .bodyContains(let substring): 
+            return body.contains(substring)
+        }
+    }
+
+    private func runTCPProbes(
+        group: DispatchGroup,
+        lock: NSLock,
+        onResult: @escaping (Bool) -> Void
+    ) {
+        for target in tcpTargets {
+            group.enter()
+            tcpConnect(host: target.host, port: target.port, timeout: ProbeConfiguration.tcpTimeout) { connected in
+                onResult(connected)
+                group.leave()
             }
+        }
+    }
 
-            if tcpConnected {
-                completion(.wifiNoInternet)
-                return
-            }
+    private func determineInternetState(
+        httpOK: Bool,
+        sawHTTPResponseButUnexpected: Bool,
+        tcpConnected: Bool,
+        path: NWPath?
+    ) -> InternetState {
+        // Prioritize real web usability first
+        if httpOK {
+            return .online
+        }
 
+        // If we got HTTP responses but none matched expectations (common on captive portals),
+        // prefer reporting "Wi‑Fi but no internet" right away.
+        if sawHTTPResponseButUnexpected {
             if let path, path.status == .satisfied, path.usesInterfaceType(.wifi) {
-                completion(.wifiNoInternet)
+                return .wifiNoInternet
             } else {
-                completion(.offline)
+                return .offline
             }
+        }
+
+        if tcpConnected {
+            return .wifiNoInternet
+        }
+
+        if let path, path.status == .satisfied, path.usesInterfaceType(.wifi) {
+            return .wifiNoInternet
+        } else {
+            return .offline
         }
     }
 
