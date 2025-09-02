@@ -8,6 +8,15 @@
 import Foundation
 import Network
 
+// MARK: - Configuration
+
+private struct ConnectivityConfiguration {
+    static let debounceDelay: TimeInterval = 0.8  // 800ms
+    static let heartbeatBase: TimeInterval = 30     // seconds
+    static let heartbeatJitter: TimeInterval = 5   // ±5s
+    static let heartbeatMinInterval: TimeInterval = 20 // safety floor
+}
+
 final class WiFiConnectivityWatcher {
     private let monitor = NWPathMonitor(requiredInterfaceType: .wifi)
     private let queue = DispatchQueue(label: "wifi.monitor.queue")
@@ -18,13 +27,9 @@ final class WiFiConnectivityWatcher {
     // Debounce + in‑flight guard
     private var debounceWork: DispatchWorkItem?
     private var isChecking = false
-    private let debounceDelay: TimeInterval = 0.8  // 800ms
 
     // Heartbeat + jitter
     private var heartbeatTimer: DispatchSourceTimer?
-    private let heartbeatBase: TimeInterval = 30     // seconds
-    private let heartbeatJitter: TimeInterval = 5   // ±10s
-        private let heartbeatMinInterval: TimeInterval = 20 // safety floor
 
     func start() {
         // Start path monitoring
@@ -37,7 +42,7 @@ final class WiFiConnectivityWatcher {
                 self?.runCheck(for: path)
             }
             self.debounceWork = work
-            self.queue.asyncAfter(deadline: .now() + self.debounceDelay, execute: work)
+            self.queue.asyncAfter(deadline: .now() + ConnectivityConfiguration.debounceDelay, execute: work)
         }
         monitor.start(queue: queue)
 
@@ -87,7 +92,7 @@ final class WiFiConnectivityWatcher {
 
     private func jitteredInterval() -> TimeInterval {
         // base ± jitter, but never below a minimum safety floor
-        let jitter = Double.random(in: -heartbeatJitter...heartbeatJitter)
-        return max(heartbeatMinInterval, heartbeatBase + jitter)
+        let jitter = Double.random(in: -ConnectivityConfiguration.heartbeatJitter...ConnectivityConfiguration.heartbeatJitter)
+        return max(ConnectivityConfiguration.heartbeatMinInterval, ConnectivityConfiguration.heartbeatBase + jitter)
     }
 }

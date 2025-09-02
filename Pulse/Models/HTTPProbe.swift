@@ -7,8 +7,8 @@
 
 import Foundation
 
-struct HTTPProbe {
-    enum Expectation {
+struct HTTPProbe: Equatable {
+    enum Expectation: Equatable {
         case status(ClosedRange<Int>)            // e.g. 204...204 or 200...299
         case exactBody(String)                   // exact match
         case bodyContains(String)                // substring match
