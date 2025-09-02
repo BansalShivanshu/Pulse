@@ -11,8 +11,8 @@ import Network
 // MARK: - Configuration
 
 private struct ProbeConfiguration {
-    static let httpTimeout: TimeInterval = 3.0
-    static let tcpTimeout: TimeInterval = 2.5
+    static let HTTP_TIMEOUT: TimeInterval = 3.0
+    static let TCP_TIMEOUT: TimeInterval = 2.5
 }
 
 /**
@@ -24,21 +24,21 @@ final class ConnectivityService {
     private let httpProbes: [HTTPProbe] = [
         // Google: tiny empty 204
         .init(url: URL(string: "https://www.google.com/generate_204")!,
-              method: "HEAD", timeout: ProbeConfiguration.httpTimeout, expectation: .status(204...204)),
+              method: "HEAD", timeout: ProbeConfiguration.HTTP_TIMEOUT, expectation: .status(204...204)),
 
         // Cloudflare: small diagnostic text body
         .init(url: URL(string: "https://www.cloudflare.com/cdn-cgi/trace")!,
-              method: "GET", timeout: ProbeConfiguration.httpTimeout, expectation: .bodyContains("h=")),
+              method: "GET", timeout: ProbeConfiguration.HTTP_TIMEOUT, expectation: .bodyContains("h=")),
 
         // Microsoft NCSI / ConnectTest (HTTP, no TLS)
         .init(url: URL(string: "http://www.msftconnecttest.com/connecttest.txt")!,
-              method: "GET", timeout: ProbeConfiguration.httpTimeout, expectation: .exactBody("Microsoft Connect Test")),
+              method: "GET", timeout: ProbeConfiguration.HTTP_TIMEOUT, expectation: .exactBody("Microsoft Connect Test")),
         .init(url: URL(string: "http://www.msftncsi.com/ncsi.txt")!,
-              method: "GET", timeout: ProbeConfiguration.httpTimeout, expectation: .exactBody("Microsoft NCSI")),
+              method: "GET", timeout: ProbeConfiguration.HTTP_TIMEOUT, expectation: .exactBody("Microsoft NCSI")),
 
         // IANA example.com (HTTP, no TLS dependency)
         .init(url: URL(string: "http://example.com/")!,
-              method: "HEAD", timeout: ProbeConfiguration.httpTimeout, expectation: .status(200...299)),
+              method: "HEAD", timeout: ProbeConfiguration.HTTP_TIMEOUT, expectation: .status(200...299)),
     ]
 
     // Raw TCP to avoid DNS/HTTP dependencies (Cloudflare + Google)
@@ -149,7 +149,7 @@ final class ConnectivityService {
     ) {
         for target in tcpTargets {
             group.enter()
-            tcpConnect(host: target.host, port: target.port, timeout: ProbeConfiguration.tcpTimeout) { connected in
+            tcpConnect(host: target.host, port: target.port, timeout: ProbeConfiguration.TCP_TIMEOUT) { connected in
                 onResult(connected)
                 group.leave()
             }
