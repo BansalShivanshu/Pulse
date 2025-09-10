@@ -48,10 +48,10 @@ public final class OsaScriptNotifier: Notifier {
 
     /// Escapes characters so they are safe to include inside AppleScript string literals.
     private static func escapeForAppleScript(_ s: String) -> String {
-        var out = s.replacingOccurrences(of: "\\", with: "\\\\")
-        out = out.replacingOccurrences(of: "\"", with: "\\\"")
-        out = out.replacingOccurrences(of: "\n", with: "\\n")
-        return out
+        return s
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
     }
 }
 
