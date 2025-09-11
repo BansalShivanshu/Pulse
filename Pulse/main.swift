@@ -12,8 +12,12 @@ final class Pulse {
     private let watcher = WiFiConnectivityWatcher()
     private let notifier: Notifier = OsaScriptNotifier()
     private var lastState: InternetState?
+    private let bypassFocusMode: Bool
 
     init() {
+        // Check for focus mode bypass flag
+        self.bypassFocusMode = CommandLine.arguments.contains("--bypass-focus-mode")
+        
         // Self-install flags (nice dev ergonomics)
         if CommandLine.arguments.contains("--install-agent") {
             do { try LaunchAgentManager.install(); print("✅ Installed & started LaunchAgent") }
@@ -32,11 +36,11 @@ final class Pulse {
 
             switch state {
             case .online:
-                self?.notifier.notify(title: "Network Status", body: "✅ Internet is available", sound: "Glass")
+                self?.notifier.notify(title: "Network Status", body: "✅ Internet is available", sound: "Glass", bypassFocusMode: self?.bypassFocusMode ?? false)
             case .wifiNoInternet:
-                self?.notifier.notify(title: "Network Status", body: "⚠️ WiFi connected, but no internet", sound: "Funk")
+                self?.notifier.notify(title: "Network Status", body: "⚠️ WiFi connected, but no internet", sound: "Funk", bypassFocusMode: self?.bypassFocusMode ?? false)
             case .offline:
-                self?.notifier.notify(title: "Network Status", body: "❌ Offline", sound: "Funk")
+                self?.notifier.notify(title: "Network Status", body: "❌ Offline", sound: "Funk", bypassFocusMode: self?.bypassFocusMode ?? false)
             }
         }
         watcher.start()
