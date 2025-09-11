@@ -41,7 +41,6 @@ public final class OsaScriptNotifier: Notifier {
             // Use display alert which bypasses focus modes like Do Not Disturb
             script = "display alert \"\(escTitle)\" message \"\(escBody)\""
             if let s = sound, !s.isEmpty {
-                let escSound = Self.escapeForAppleScript(s)
                 // Note: display alert doesn't support sound parameter, so we play it separately
                 script += "; beep"
             }
