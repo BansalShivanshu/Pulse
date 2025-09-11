@@ -16,6 +16,7 @@ import Foundation
 /// Allows swapping the delivery mechanism without changing the main app logic.
 public protocol Notifier {
     func notify(title: String, body: String, sound: String?)
+    func notify(title: String, body: String, sound: String?, bypassFocusMode: Bool)
 }
 
 // MARK: - AppleScript / osascript notifier
@@ -27,13 +28,29 @@ public final class OsaScriptNotifier: Notifier {
     public init() {}
 
     public func notify(title: String, body: String, sound: String? = nil) {
+        notify(title: title, body: body, sound: sound, bypassFocusMode: false)
+    }
+
+    public func notify(title: String, body: String, sound: String? = nil, bypassFocusMode: Bool) {
         let escTitle = Self.escapeForAppleScript(title)
         let escBody  = Self.escapeForAppleScript(body)
 
-        var script = "display notification \"\(escBody)\" with title \"\(escTitle)\""
-        if let s = sound, !s.isEmpty {
-            let escSound = Self.escapeForAppleScript(s)
-            script += " sound name \"\(escSound)\""
+        var script: String
+        
+        if bypassFocusMode {
+            // Use display alert which bypasses focus modes like Do Not Disturb
+            script = "display alert \"\(escTitle)\" message \"\(escBody)\""
+            if let s = sound, !s.isEmpty {
+                // Note: display alert doesn't support sound parameter, so we play it separately
+                script += "; beep"
+            }
+        } else {
+            // Use standard display notification which respects focus modes
+            script = "display notification \"\(escBody)\" with title \"\(escTitle)\""
+            if let s = sound, !s.isEmpty {
+                let escSound = Self.escapeForAppleScript(s)
+                script += " sound name \"\(escSound)\""
+            }
         }
 
         let p = Process()
@@ -62,4 +79,5 @@ public final class OsaScriptNotifier: Notifier {
 public final class NoOpNotifier: Notifier {
     public init() {}
     public func notify(title: String, body: String, sound: String?) { /* intentionally empty */ }
+    public func notify(title: String, body: String, sound: String?, bypassFocusMode: Bool) { /* intentionally empty */ }
 }
